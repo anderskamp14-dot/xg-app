@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚽ xG Kalkylator Ultimate</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --grass:#1a6b2e; --grass2:#1d7833; --line:rgba(255,255,255,0.85);
+  --bg:#080f0a; --panel:#0e1a10; --border:#1e3322; --accent:#39ff6a;
+  --orange:#ff6b1a; --red:#ff3a3a; --white:#f0f7f1; --muted:#5a7a60;
+  --shot:#ff6b1a; --gk:#facc15; --def:#ef4444;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:var(--bg); color:var(--white); font-family:'DM Sans',sans-serif;
+  min-height:100vh; overflow-x:hidden;
+}
+header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:1.2rem 2rem; border-bottom:1px solid var(--border); background:var(--panel);
+}
+.logo {
+  font-family:'Bebas Neue',sans-serif; font-size:2rem; letter-spacing:3px;
+  color:var(--accent); text-shadow:0 0 20px rgba(57,255,106,0.4);
+}
+.logo span { color:var(--white); }
+.logo .badge { font-size:0.5em; color:var(--orange); }
+.match-info { display:flex; gap:1rem; align-items:center; }
+.match-info input {
+  background:var(--bg); border:1px solid var(--border); color:var(--white);
+  padding:0.4rem 0.8rem; border-radius:6px; font-family:'DM Sans',sans-serif;
+  font-size:0.9rem; width:140px;
+}
+.match-info input::placeholder { color:var(--muted); }
+.app { display:grid; grid-template-columns:1fr 440px; gap:0; height:calc(100vh - 65px); }
+.pitch-area {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:1.5rem; gap:1rem; background:#080f0a;
+}
+.mode-bar {
+  display:flex; gap:0.5rem; background:var(--panel); padding:0.4rem;
+  border-radius:10px; border:1px solid var(--border); flex-wrap:wrap;
+}
+.mode-btn {
+  padding:0.5rem 1rem; border:none; border-radius:7px; font-family:'DM Sans',sans-serif;
+  font-size:0.8rem; font-weight:600; cursor:pointer; transition:all 0.2s;
+  background:transparent; color:var(--muted);
+}
+.mode-btn.active { background:var(--accent); color:#000; }
+.mode-btn:hover:not(.active) { color:var(--white); }
+.pitch-wrapper { position:relative; filter:drop-shadow(0 20px 60px rgba(0,0,0,0.8)); }
+#pitch { cursor:crosshair; display:block; border-radius:4px; }
+.pitch-hint { font-size:0.8rem; color:var(--muted); text-align:center; font-style:italic; }
+.panel {
+  background:var(--panel); border-left:1px solid var(--border);
+  display:flex; flex-direction:column; overflow-y:auto;
+}
+.panel-section { padding:1.2rem 1.4rem; border-bottom:1px solid var(--border); }
+.panel-section:last-child { border-bottom:none; }
+.section-title {
+  font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:2px;
+  color:var(--accent); margin-bottom:0.8rem;
+}
+.team-toggle {
+  display:flex; gap:0; background:var(--bg); border:1px solid var(--border);
+  border-radius:10px; overflow:hidden; margin-bottom:0.8rem; width:100%;
+}
+.team-toggle-btn {
+  flex:1; padding:0.6rem; border:none; font-family:'DM Sans',sans-serif;
+  font-size:0.85rem; font-weight:700; cursor:pointer; transition:all 0.2s;
+  background:transparent; color:var(--muted);
+}
+.team-toggle-btn.home.active { background:var(--accent); color:#000; }
+.team-toggle-btn.away.active { background:#3b82f6; color:#fff; }
+.team-toggle-btn:hover:not(.active) { color:var(--white); }
+.xg-hero {
+  text-align:center; padding:1rem; background:rgba(57,255,106,0.05);
+  border:1px solid rgba(57,255,106,0.2); border-radius:12px; margin-bottom:0.8rem;
+}
+.xg-number {
+  font-family:'JetBrains Mono',monospace; font-size:3rem; font-weight:700;
+  color:var(--accent); line-height:1; transition:all 0.3s;
+}
+.xg-label { font-size:0.75rem; color:var(--muted); letter-spacing:2px; margin-top:0.3rem; }
+.xg-quality {
+  font-size:1rem; font-weight:600; margin-top:0.5rem; padding:0.3rem 0.8rem;
+  border-radius:20px; display:inline-block;
+}
+.stats-mini {
+  display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:0.8rem;
+}
+.stat-mini {
+  background:rgba(255,255,255,0.03); border:1px solid var(--border);
+  border-radius:8px; padding:0.6rem; text-align:center;
+}
+.stat-mini-val {
+  font-family:'JetBrains Mono',monospace; font-size:1.2rem; font-weight:700;
+  color:var(--orange);
+}
+.stat-mini-lbl { font-size:0.7rem; color:var(--muted); margin-top:0.2rem; }
+.option-row { display:flex; gap:0.4rem; margin-bottom:0.6rem; flex-wrap:wrap; }
+.option-row label {
+  font-size:0.8rem; color:var(--muted); margin-bottom:0.3rem; display:block;
+}
+.chip {
+  padding:0.3rem 0.7rem; border-radius:20px; border:1px solid var(--border);
+  font-size:0.75rem; cursor:pointer; transition:all 0.15s; background:transparent;
+  color:var(--muted); font-family:'DM Sans',sans-serif;
+}
+.chip.active {
+  background:var(--accent); color:#000; border-color:var(--accent); font-weight:700;
+}
+.chip:hover:not(.active) { border-color:var(--accent); color:var(--white); }
+select.chip-select {
+  padding:0.4rem 0.7rem; border-radius:8px; border:1px solid var(--border);
+  background:var(--bg); color:var(--white); font-size:0.85rem;
+  font-family:'DM Sans',sans-serif; cursor:pointer; width:100%;
+}
+.add-btn {
+  width:100%; padding:0.9rem; background:var(--accent); color:#000; border:none;
+  border-radius:10px; font-family:'Bebas Neue',sans-serif; font-size:1.2rem;
+  letter-spacing:2px; cursor:pointer; transition:all 0.2s;
+}
+.add-btn:hover { background:#5fff8a; transform:translateY(-1px); }
+.add-btn:disabled { background:var(--border); color:var(--muted); transform:none; cursor:not-allowed; }
+.shot-list { display:flex; flex-direction:column; gap:0.5rem; max-height:350px; overflow-y:auto; }
+.shot-item {
+  display:flex; align-items:center; gap:0.7rem; padding:0.7rem;
+  background:rgba(255,255,255,0.03); border:1px solid var(--border);
+  border-radius:8px; transition:all 0.2s; cursor:pointer;
+}
+.shot-item.away-shot { border-left:3px solid #3b82f6; }
+.shot-item.home-shot { border-left:3px solid var(--accent); }
+.shot-item:hover { border-color:var(--orange); background:rgba(255,107,26,0.05); }
+.shot-num {
+  font-family:'JetBrains Mono',monospace; font-size:0.75rem;
+  color:var(--muted); min-width:22px;
+}
+.shot-xg {
+  font-family:'JetBrains Mono',monospace; font-weight:700; font-size:1rem;
+}
+.shot-details { font-size:0.75rem; color:var(--muted); flex:1; }
+.shot-delete {
+  background:none; border:none; color:var(--muted); cursor:pointer;
+  font-size:1rem; padding:0.2rem; border-radius:4px; transition:color 0.15s;
+}
+.shot-delete:hover { color:var(--red); }
+.summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.6rem; }
+.summary-box {
+  background:rgba(255,255,255,0.03); border:1px solid var(--border);
+  border-radius:10px; padding:0.8rem; text-align:center;
+}
+.summary-box.highlight {
+  border-color:rgba(57,255,106,0.4); background:rgba(57,255,106,0.05);
+}
+.summary-val {
+  font-family:'JetBrains Mono',monospace; font-size:1.6rem; font-weight:700;
+  color:var(--accent);
+}
+.summary-lbl { font-size:0.7rem; color:var(--muted); margin-top:0.2rem; }
+.export-btn {
+  width:100%; padding:0.8rem; background:transparent; color:var(--accent);
+  border:1px solid var(--accent); border-radius:10px; font-family:'DM Sans',sans-serif;
+  font-size:0.9rem; font-weight:600; cursor:pointer; transition:all 0.2s; margin-top:0.5rem;
+}
+.export-btn:hover { background:rgba(57,255,106,0.1); }
+.export-btn.excel { background:var(--orange); color:#000; border-color:var(--orange); }
+.export-btn.excel:hover { background:#ff8533; }
+.legend {
+  display:flex; gap:1rem; font-size:0.75rem; color:var(--muted); flex-wrap:wrap;
+}
+.legend-item { display:flex; align-items:center; gap:0.3rem; }
+.legend-dot { width:10px; height:10px; border-radius:50%; }
+.panel::-webkit-scrollbar { width:4px; }
+.panel::-webkit-scrollbar-track { background:var(--bg); }
+.panel::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+.analysis-box {
+  background:rgba(251,133,0,0.05); border:1px solid rgba(251,133,0,0.3);
+  border-radius:10px; padding:1rem; margin-top:1rem;
+}
+.analysis-title {
+  font-size:0.9rem; font-weight:700; color:var(--orange);
+  margin-bottom:0.5rem; letter-spacing:1px;
+}
+.analysis-item {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:0.4rem 0; border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.analysis-item:last-child { border-bottom:none; }
+.analysis-label { font-size:0.85rem; color:var(--white); }
+.analysis-value {
+  font-family:'JetBrains Mono',monospace; font-weight:700;
+  font-size:0.9rem; color:var(--orange);
+}
+.player-input-group {
+  display:flex; gap:0.5rem; align-items:center;
+}
+.player-add-btn {
+  padding:0.4rem 0.8rem; background:var(--orange); color:#000;
+  border:none; border-radius:6px; font-size:0.75rem; font-weight:700;
+  cursor:pointer; transition:all 0.2s;
+}
+.player-add-btn:hover { background:#ff8533; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚽ xG<span>Kalkylator</span><span class="badge"> ULTIMATE</span></div>
+  <div class="match-info">
+    <input type="text" id="teamHome" placeholder="Hemmalag">
+    <span style="color:var(--muted)">vs</span>
+    <input type="text" id="teamAway" placeholder="Bortalag">
+    <input type="date" id="matchDate">
+  </div>
+</header>
+
+<div class="app">
+  <div class="pitch-area">
+    <div class="mode-bar">
+      <button class="mode-btn active" id="modeShot" onclick="setMode('shot')">🎯 Skott</button>
+      <button class="mode-btn" id="modeGK" onclick="setMode('gk')">🧤 MV</button>
+      <button class="mode-btn" id="modeDef" onclick="setMode('def')">🛡️ Försvare</button>
+      <button class="mode-btn" id="modeAssist" onclick="setMode('assist')">👟 Assist</button>
+      <button class="mode-btn" id="modeClear" onclick="clearTemp()">🗑️ Rensa</button>
+    </div>
+    <div class="pitch-wrapper">
+      <svg id="pitch" width="800" height="520" viewBox="0 0 800 520"></svg>
+    </div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--shot)"></div> Skott</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--gk)"></div> Målvakt</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--def)"></div> Försvarare</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div> Assist</div>
+    </div>
+    <div class="pitch-hint" id="hintText">Välj lag och klicka på planen</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-section">
+      <div class="section-title">Aktuellt skott</div>
+      <div class="team-toggle">
+        <button class="team-toggle-btn home active" id="teamHomeBtn" onclick="setTeam('home')">
+          🟢 HEMMA (xG)
+        </button>
+        <button class="team-toggle-btn away" id="teamAwayBtn" onclick="setTeam('away')">
+          🔵 BORTA (xGA)
+        </button>
+      </div>
+      <div class="xg-hero">
+        <div class="xg-number" id="xgDisplay">—</div>
+        <div class="xg-label">EXPECTED GOALS</div>
+        <div class="xg-quality" id="xgQuality" style="color:var(--muted)">Placera skott</div>
+      </div>
+      <div class="stats-mini">
+        <div class="stat-mini">
+          <div class="stat-mini-val" id="distDisplay">—</div>
+          <div class="stat-mini-lbl">AVSTÅND (m)</div>
+        </div>
+        <div class="stat-mini">
+          <div class="stat-mini-val" id="angleDisplay">—</div>
+          <div class="stat-mini-lbl">VINKEL (°)</div>
+        </div>
+        <div class="stat-mini">
+          <div class="stat-mini-val" id="defDisplay">0</div>
+          <div class="stat-mini-lbl">FÖRSVARARE</div>
+        </div>
+        <div class="stat-mini">
+          <div class="stat-mini-val" id="gkDisplay">—</div>
+          <div class="stat-mini-lbl">MÅLVAKTSPOS</div>
+        </div>
+      </div>
+
+      <!-- Kroppsdelar -->
+      <div style="margin-bottom:0.6rem">
+        <label style="font-size:0.8rem; color:var(--muted); margin-bottom:0.4rem; display:block">Kroppsdelar:</label>
+        <div class="option-row" id="bodyChips">
+          <button class="chip active" onclick="setChip('body',this,'foot')">⚽ Fot</button>
+          <button class="chip" onclick="setChip('body',this,'head')">🤕 Huvud</button>
+          <button class="chip" onclick="setChip('body',this,'other')">🦵 Annat</button>
+        </div>
+      </div>
+
+      <!-- Hur uppstod chansen? -->
+      <div style="margin-bottom:0.6rem">
+        <label style="font-size:0.8rem; color:var(--muted); margin-bottom:0.4rem; display:block">🎯 Hur uppstod chansen?</label>
+        <div class="option-row" id="originChips">
+          <button class="chip active" onclick="setChip('origin',this,'open')">🟢 Öppet</button>
+          <button class="chip" onclick="setChip('origin',this,'counter')">⚡ Kontr</button>
+          <button class="chip" onclick="setChip('origin',this,'corner')">🚩 Hörna</button>
+          <button class="chip" onclick="setChip('origin',this,'freekick')">🎯 Frispark</button>
+          <button class="chip" onclick="setChip('origin',this,'penalty')">🟡 Straff</button>
+          <button class="chip" onclick="setChip('origin',this,'press')">💪 Press</button>
+          <button class="chip" onclick="setChip('origin',this,'mistake')">😬 Misstag</button>
+        </div>
+      </div>
+
+      <!-- Zon -->
+      <div style="margin-bottom:0.6rem">
+        <label style="font-size:0.8rem; color:var(--muted); margin-bottom:0.4rem; display:block">📍 Zon:</label>
+        <div class="option-row" id="zoneChips">
+          <button class="chip active" onclick="setChip('zone',this,'center')">🎯 Mitt</button>
+          <button class="chip" onclick="setChip('zone',this,'left')">⬅️ Väns</button>
+          <button class="chip" onclick="setChip('zone',this,'right')">➡️ Höger</button>
+        </div>
+      </div>
+
+      <!-- Vem sköt? -->
+      <div style="margin-bottom:0.6rem">
+        <label style="font-size:0.8rem; color:var(--muted); margin-bottom:0.4rem; display:block">👤 Vem sköt?</label>
+        <div class="player-input-group">
+          <select id="playerSelect" class="chip-select" style="flex:1">
+            <option value="">-- Välj spelare --</option>
+          </select>
+          <button class="player-add-btn" onclick="addPlayerPrompt()">+ Lägg till</button>
+        </div>
+      </div>
+
+      <!-- Assist från vem? -->
+      <div style="margin-bottom:0.8rem">
+        <label style="font-size:0.8rem; color:var(--muted); margin-bottom:0.4rem; display:block">👟 Assist från?</label>
+        <select id="assistSelect" class="chip-select">
+          <option value="">-- Ingen assist --</option>
+        </select>
+        <div id="assistPos" style="font-size:0.75rem; color:var(--orange); margin-top:0.3rem;">
+          Klicka "👟 Assist" och placera assistgivaren på planen
+        </div>
+      </div>
+
+      <button class="add-btn" id="addBtn" onclick="addShot()" disabled>+ LÄGG TILL SKOTT</button>
+    </div>
+
+    <div class="panel-section" style="flex:1">
+      <div class="section-title">Skottlogg</div>
+      <div class="shot-list" id="shotList">
+        <div style="color:var(--muted); font-size:0.85rem; text-align:center; padding:1rem;">
+          Inga skott ännu.<br>Välj lag och klicka på planen!
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Matchsammanfattning</div>
+      <div class="summary-grid">
+        <div class="summary-box highlight">
+          <div class="summary-val" id="sumXG">0.00</div>
+          <div class="summary-lbl">xG (HEMMA)</div>
+        </div>
+        <div class="summary-box" style="border-color:rgba(59,130,246,0.4); background:rgba(59,130,246,0.05)">
+          <div class="summary-val" id="sumXGA" style="color:#3b82f6">0.00</div>
+          <div class="summary-lbl">xGA (BORTA)</div>
+        </div>
+        <div class="summary-box">
+          <div class="summary-val" id="sumShots">0</div>
+          <div class="summary-lbl">SKOTT HEMMA</div>
+        </div>
+        <div class="summary-box">
+          <div class="summary-val" id="sumShotsAway" style="color:#3b82f6">0</div>
+          <div class="summary-lbl">SKOTT BORTA</div>
+        </div>
+        <div class="summary-box">
+          <div class="summary-val" id="sumBig">0</div>
+          <div class="summary-lbl">STORA CHANSER</div>
+        </div>
+        <div class="summary-box">
+          <div class="summary-val" id="sumBigAway" style="color:#3b82f6">0</div>
+          <div class="summary-lbl">STORA CH. MOT</div>
+        </div>
+        <div class="summary-box" style="grid-column:span 2; border-color:rgba(255,255,255,0.1)">
+          <div id="xgDiff" style="font-family:'JetBrains Mono',monospace; font-size:1.1rem; font-weight:700;">xG-diff: —</div>
+          <div class="summary-lbl">HEMMA xG MINUS BORTA xGA</div>
+        </div>
+      </div>
+
+      <!-- Analys-boxar -->
+      <div class="analysis-box" id="chanceAnalysis" style="display:none">
+        <div class="analysis-title">🎯 CHANSSKAPANDE</div>
+        <div id="chanceBreakdown"></div>
+      </div>
+
+      <div class="analysis-box" id="zoneAnalysis" style="display:none">
+        <div class="analysis-title">📍 ZONANALYS</div>
+        <div id="zoneBreakdown"></div>
+      </div>
+
+      <div class="analysis-box" id="playerAnalysis" style="display:none">
+        <div class="analysis-title">👤 TOPSCORERS</div>
+        <div id="playerBreakdown"></div>
+      </div>
+
+      <div class="analysis-box" id="assistAnalysis" style="display:none">
+        <div class="analysis-title">👟 TOPASSISTER</div>
+        <div id="assistBreakdown"></div>
+      </div>
+
+      <button class="export-btn excel" onclick="exportExcel()">📊 Exportera till Excel</button>
+      <button class="export-btn" onclick="exportReport()">💾 Exportera textrapport</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+// ── STATE ──
+const PITCH_W = 800, PITCH_H = 520;
+const PITCH_M = 105;  // Verklig längd i meter
+const PITCH_M_H = 68; // Verklig bredd i meter
+
+const GOAL_RIGHT_X = PITCH_W - 20;
+const GOAL_LEFT_X = 20;
+const GOAL_Y1 = PITCH_H/2 - 36;
+const GOAL_Y2 = PITCH_H/2 + 36;
+const GOAL_CENTER_Y = PITCH_H/2;
+
+let mode = 'shot', team = 'home';
+let temp = {shot:null, gk:null, defenders:[], assist:null};
+let shots = [], shotCount = 0, currentXG = null;
+let bodyPart = 'foot', origin = 'open', zone = 'center', player = '', assist = '';
+let players = JSON.parse(localStorage.getItem('xg_players') || '[]');
+
+function getGoalX() { return team === 'home' ? GOAL_RIGHT_X : GOAL_LEFT_X; }
+
+// ── SPELARLISTA ──
+function updatePlayerList() {
+  const sel = document.getElementById('playerSelect');
+  const ass = document.getElementById('assistSelect');
+  const opts = '<option value="">-- Välj spelare --</option>' + players.map(p => `<option value="${p}">${p}</option>`).join('');
+  sel.innerHTML = opts;
+  ass.innerHTML = '<option value="">-- Ingen assist --</option>' + players.map(p => `<option value="${p}">${p}</option>`).join('');
+}
+updatePlayerList();
+
+function addPlayerPrompt() {
+  const name = prompt('Lägg till spelare:');
+  if (name && name.trim() && !players.includes(name.trim())) {
+    players.push(name.trim());
+    players.sort();
+    localStorage.setItem('xg_players', JSON.stringify(players));
+    updatePlayerList();
+  }
+}
+
+// ── DETALJERAD PITCH ──
+function drawPitch() {
+  const svg = document.getElementById('pitch');
+  svg.innerHTML = '';
+  const ns = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs) {
+    const e = document.createElementNS(ns, tag);
+    Object.entries(attrs).forEach(([k,v]) => e.setAttribute(k,v));
+    svg.appendChild(e);
+    return e;
+  }
+  
+  // RÄKNA UT EXAKTA PIXELPOSITIONER
+  const MARGIN = 20;
+  const PLAYABLE_WIDTH = PITCH_W - (MARGIN * 2);  // 760px
+  const PLAYABLE_HEIGHT = PITCH_H - (MARGIN * 2); // 480px
+  
+  // Pixels per meter
+  const PPM_X = PLAYABLE_WIDTH / 105;   // ~7.24 pixels per meter i längd
+  const PPM_Y = PLAYABLE_HEIGHT / 68;   // ~7.06 pixels per meter i bredd
+  
+  // Mållinjer
+  const GOAL_LINE_LEFT = MARGIN;
+  const GOAL_LINE_RIGHT = PITCH_W - MARGIN;
+  
+  // Straffområde: 16.5m från mållinjen, 40.3m bred
+  const PENALTY_DEPTH = 16.5 * PPM_X;  // ~119.5px
+  const PENALTY_WIDTH = 40.3 * PPM_Y;  // ~284px
+  const PENALTY_Y_START = (PITCH_H - PENALTY_WIDTH) / 2;
+  
+  // Straffpunkt: 11m från mållinjen
+  const PENALTY_SPOT_DIST = 11 * PPM_X;  // ~79.6px
+  
+  // Lilla straffytan: 5.5m från mållinjen, 18.3m bred
+  const GOAL_AREA_DEPTH = 5.5 * PPM_X;   // ~39.8px
+  const GOAL_AREA_WIDTH = 18.3 * PPM_Y;  // ~129px
+  const GOAL_AREA_Y_START = (PITCH_H - GOAL_AREA_WIDTH) / 2;
+  
+  // Mål: 7.32m brett
+  const GOAL_WIDTH = 7.32 * PPM_Y;  // ~51.7px
+  const GOAL_Y_START = (PITCH_H - GOAL_WIDTH) / 2;
+  
+  // Ränder
+  for (let i=0; i<11; i++) {
+    el('rect', {x:i*72.7, y:0, width:72.7, height:PITCH_H, fill:i%2===0?'#1a6b2e':'#1d7833'});
+  }
+  
+  // Kantlinje
+  el('rect', {x:MARGIN, y:MARGIN, width:PLAYABLE_WIDTH, height:PLAYABLE_HEIGHT, 
+    fill:'none', stroke:'rgba(255,255,255,0.85)', 'stroke-width':3});
+  
+  // Mittlinje
+  el('line', {x1:PITCH_W/2, y1:MARGIN, x2:PITCH_W/2, y2:PITCH_H-MARGIN, 
+    stroke:'rgba(255,255,255,0.85)', 'stroke-width':2});
+  
+  // Mittelcirkel (radie 9.15m)
+  const CENTER_CIRCLE_R = 9.15 * PPM_X;
+  el('circle', {cx:PITCH_W/2, cy:PITCH_H/2, r:CENTER_CIRCLE_R, 
+    fill:'none', stroke:'rgba(255,255,255,0.85)', 'stroke-width':2});
+  el('circle', {cx:PITCH_W/2, cy:PITCH_H/2, r:3, fill:'rgba(255,255,255,0.9)'});
+  
+  // === HÖGER SIDA (ANFALL) ===
+  
+  // Straffområde höger
+  const PA_RIGHT_X = GOAL_LINE_RIGHT - PENALTY_DEPTH;
+  el('rect', {x:PA_RIGHT_X, y:PENALTY_Y_START, width:PENALTY_DEPTH, height:PENALTY_WIDTH, 
+    fill:'rgba(255,255,255,0.04)', stroke:'rgba(255,255,255,0.85)', 'stroke-width':2});
+  
+  // Lilla straffytan höger
+  const GA_RIGHT_X = GOAL_LINE_RIGHT - GOAL_AREA_DEPTH;
+  el('rect', {x:GA_RIGHT_X, y:GOAL_AREA_Y_START, width:GOAL_AREA_DEPTH, height:GOAL_AREA_WIDTH, 
+    fill:'none', stroke:'rgba(255,255,255,0.7)', 'stroke-width':1.5});
+  
+  // Straffdot höger (11m från mål)
+  const PENALTY_SPOT_RIGHT_X = GOAL_LINE_RIGHT - PENALTY_SPOT_DIST;
+  el('circle', {cx:PENALTY_SPOT_RIGHT_X, cy:PITCH_H/2, r:4, fill:'rgba(255,255,255,0.95)'});
+  
+  // Straffbåge höger (radie 9.15m från straffdot)
+  const ARC_RADIUS = 9.15 * PPM_X;
+  const arcStartY = PITCH_H/2 - 60;
+  const arcEndY = PITCH_H/2 + 60;
+  el('path', {d:`M ${PA_RIGHT_X} ${arcStartY} A ${ARC_RADIUS} ${ARC_RADIUS} 0 0 0 ${PA_RIGHT_X} ${arcEndY}`,
+    fill:'none', stroke:'rgba(255,255,255,0.7)', 'stroke-width':1.5});
+  
+  // === VÄNSTER SIDA (FÖRSVAR) ===
+  
+  // Straffområde vänster
+  const PA_LEFT_X = GOAL_LINE_LEFT;
+  el('rect', {x:PA_LEFT_X, y:PENALTY_Y_START, width:PENALTY_DEPTH, height:PENALTY_WIDTH, 
+    fill:'rgba(255,255,255,0.03)', stroke:'rgba(255,255,255,0.7)', 'stroke-width':1.5});
+  
+  // Lilla straffytan vänster
+  const GA_LEFT_X = GOAL_LINE_LEFT;
+  el('rect', {x:GA_LEFT_X, y:GOAL_AREA_Y_START, width:GOAL_AREA_DEPTH, height:GOAL_AREA_WIDTH, 
+    fill:'none', stroke:'rgba(255,255,255,0.5)', 'stroke-width':1});
+  
+  // Straffdot vänster
+  const PENALTY_SPOT_LEFT_X = GOAL_LINE_LEFT + PENALTY_SPOT_DIST;
+  el('circle', {cx:PENALTY_SPOT_LEFT_X, cy:PITCH_H/2, r:4, fill:'rgba(255,255,255,0.7)'});
+  
+  // Straffbåge vänster
+  el('path', {d:`M ${PA_LEFT_X + PENALTY_DEPTH} ${arcStartY} A ${ARC_RADIUS} ${ARC_RADIUS} 0 0 1 ${PA_LEFT_X + PENALTY_DEPTH} ${arcEndY}`,
+    fill:'none', stroke:'rgba(255,255,255,0.5)', 'stroke-width':1});
+  
+  // === MÅL ===
+  
+  // Mål höger (anfall)
+  el('rect', {x:GOAL_LINE_RIGHT, y:GOAL_Y_START, width:20, height:GOAL_WIDTH, 
+    fill:'rgba(255,255,255,0.15)', stroke:'rgba(255,255,255,0.95)', 'stroke-width':4});
+  el('line', {x1:GOAL_LINE_RIGHT, y1:PITCH_H/2, x2:GOAL_LINE_RIGHT+20, y2:PITCH_H/2, 
+    stroke:'rgba(255,255,255,0.5)', 'stroke-width':1, 'stroke-dasharray':'4,4'});
+  
+  // Mål vänster
+  el('rect', {x:0, y:GOAL_Y_START, width:MARGIN, height:GOAL_WIDTH,
+    fill:'rgba(255,255,255,0.1)', stroke:'rgba(255,255,255,0.7)', 'stroke-width':3});
+  
+  // Hörnflaggor
+  [[MARGIN,MARGIN],[GOAL_LINE_RIGHT,MARGIN],[MARGIN,PITCH_H-MARGIN],[GOAL_LINE_RIGHT,PITCH_H-MARGIN]].forEach(([x,y]) => {
+    el('circle', {cx:x, cy:y, r:5, fill:'none', stroke:'rgba(255,255,255,0.7)', 'stroke-width':1.5});
+  });
+  
+  // Hjälplinjer - horisontella zoner
+  for (let i=1; i<=4; i++) {
+    const y = MARGIN + (PLAYABLE_HEIGHT/5) * i;
+    el('line', {x1:MARGIN, y1:y, x2:GOAL_LINE_RIGHT, y2:y, 
+      stroke:'rgba(255,255,255,0.1)', 'stroke-width':1, 'stroke-dasharray':'5,5'});
+  }
+  
+  // Hjälplinjer - vertikala zoner
+  for (let i=1; i<=6; i++) {
+    const x = MARGIN + (PLAYABLE_WIDTH/7) * i;
+    el('line', {x1:x, y1:MARGIN, x2:x, y2:PITCH_H-MARGIN, 
+      stroke:'rgba(255,255,255,0.08)', 'stroke-width':1, 'stroke-dasharray':'5,5'});
+  }
+  
+  // Text: Avståndmarkering
+  const txt16 = document.createElementNS(ns, 'text');
+  txt16.setAttribute('x', PA_RIGHT_X + PENALTY_DEPTH/2);
+  txt16.setAttribute('y', PITCH_H - 8);
+  txt16.setAttribute('text-anchor', 'middle');
+  txt16.setAttribute('fill', 'rgba(255,255,255,0.3)');
+  txt16.setAttribute('font-size', '10');
+  txt16.setAttribute('font-family', 'DM Sans');
+  txt16.textContent = '16.5m';
+  svg.appendChild(txt16);
+  
+  const txt11 = document.createElementNS(ns, 'text');
+  txt11.setAttribute('x', PENALTY_SPOT_RIGHT_X);
+  txt11.setAttribute('y', PITCH_H/2 + 20);
+  txt11.setAttribute('text-anchor', 'middle');
+  txt11.setAttribute('fill', 'rgba(255,255,255,0.4)');
+  txt11.setAttribute('font-size', '9');
+  txt11.setAttribute('font-family', 'DM Sans');
+  txt11.textContent = '11m';
+  svg.appendChild(txt11);
+  
+  redrawMarkers();
+}
+
+function redrawMarkers() {
+  document.querySelectorAll('.marker').forEach(e => e.remove());
+  const svg = document.getElementById('pitch'), ns = 'http://www.w3.org/2000/svg';
+  
+  function addMarker(x, y, color, label, size=10) {
+    const g = document.createElementNS(ns, 'g');
+    g.setAttribute('class', 'marker');
+    
+    const ring = document.createElementNS(ns, 'circle');
+    ring.setAttribute('cx', x); ring.setAttribute('cy', y); ring.setAttribute('r', size+4);
+    ring.setAttribute('fill','none'); ring.setAttribute('stroke', color); 
+    ring.setAttribute('stroke-width', 2); ring.setAttribute('opacity','0.6');
+    g.appendChild(ring);
+    
+    const dot = document.createElementNS(ns, 'circle');
+    dot.setAttribute('cx', x); dot.setAttribute('cy', y); dot.setAttribute('r', size);
+    dot.setAttribute('fill', color); dot.setAttribute('opacity','0.95');
+    g.appendChild(dot);
+    
+    const txt = document.createElementNS(ns, 'text');
+    txt.setAttribute('x', x); txt.setAttribute('y', y+4);
+    txt.setAttribute('text-anchor','middle'); txt.setAttribute('fill','#000');
+    txt.setAttribute('font-size','9'); txt.setAttribute('font-weight','bold');
+    txt.setAttribute('font-family','DM Sans'); txt.textContent = label;
+    g.appendChild(txt);
+    
+    svg.appendChild(g);
+  }
+  
+  const gx = getGoalX();
+  
+  if (temp.shot) {
+    // Skottlinjer
+    [[GOAL_CENTER_Y, 'rgba(255,255,255,0.4)', '8,4'], 
+     [GOAL_Y1, 'rgba(255,200,0,0.25)', null],
+     [GOAL_Y2, 'rgba(255,200,0,0.25)', null]].forEach(([gy, stroke, dash]) => {
+      const line = document.createElementNS(ns, 'line');
+      line.setAttribute('class','marker');
+      line.setAttribute('x1', temp.shot.x); line.setAttribute('y1', temp.shot.y);
+      line.setAttribute('x2', gx); line.setAttribute('y2', gy);
+      line.setAttribute('stroke', stroke); line.setAttribute('stroke-width', dash ? 2 : 1.5);
+      if (dash) line.setAttribute('stroke-dasharray', dash);
+      svg.appendChild(line);
+    });
+    
+    const shotColor = team === 'home' ? '#39ff6a' : '#3b82f6';
+    addMarker(temp.shot.x, temp.shot.y, shotColor, '⚽', 12);
+  }
+  
+  // Assist-linje
+  if (temp.assist && temp.shot) {
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('class','marker');
+    line.setAttribute('x1', temp.assist.x); line.setAttribute('y1', temp.assist.y);
+    line.setAttribute('x2', temp.shot.x); line.setAttribute('y2', temp.shot.y);
+    line.setAttribute('stroke', '#8b5cf6'); line.setAttribute('stroke-width', 2);
+    line.setAttribute('stroke-dasharray', '6,3'); line.setAttribute('opacity', '0.7');
+    svg.appendChild(line);
+    addMarker(temp.assist.x, temp.assist.y, '#8b5cf6', '👟', 10);
+  }
+  
+  if (temp.gk) addMarker(temp.gk.x, temp.gk.y, '#facc15', 'MV', 9);
+  temp.defenders.forEach((d,i) => addMarker(d.x, d.y, '#ef4444', i+1+'', 8));
+  
+  // Sparade skott
+  shots.forEach(s => {
+    const dot = document.createElementNS(ns, 'circle');
+    dot.setAttribute('class','marker');
+    dot.setAttribute('cx', s.px); dot.setAttribute('cy', s.py);
+    dot.setAttribute('r', 6);
+    dot.setAttribute('fill', s.team === 'home' ? xgColor(s.xg) : '#3b82f6');
+    dot.setAttribute('opacity','0.75');
+    svg.appendChild(dot);
+  });
+}
+
+document.getElementById('pitch').addEventListener('click', function(e) {
+  const rect = this.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (PITCH_W / rect.width);
+  const y = (e.clientY - rect.top) * (PITCH_H / rect.height);
+  
+  if (mode === 'shot') {
+    temp.shot = {x, y}; temp.gk = null; temp.defenders = []; temp.assist = null;
+    updateHint('Placera målvakt/försvarare (valfritt) eller lägg till');
+  } else if (mode === 'gk') {
+    if (!temp.shot) { updateHint('⚠️ Placera skottet först!'); return; }
+    temp.gk = {x, y};
+    updateHint('Placera försvarare (valfritt)');
+  } else if (mode === 'def') {
+    if (!temp.shot) { updateHint('⚠️ Placera skottet först!'); return; }
+    if (temp.defenders.length < 5) temp.defenders.push({x, y});
+    updateHint(`${temp.defenders.length} försvarare`);
+  } else if (mode === 'assist') {
+    if (!temp.shot) { updateHint('⚠️ Placera skottet först!'); return; }
+    temp.assist = {x, y};
+    document.getElementById('assistPos').textContent = '✅ Assistposition placerad';
+    updateHint('Assistgivare placerad!');
+  }
+  
+  if (temp.shot) { calculateXG(); document.getElementById('addBtn').disabled = false; }
+  redrawMarkers();
+});
+
+function calculateXG() {
+  if (!temp.shot) return;
+  const sx = temp.shot.x, sy = temp.shot.y, gx = getGoalX();
+  
+  // SAMMA BERÄKNING SOM PLANEN ANVÄNDER
+  const MARGIN = 20;
+  const PLAYABLE_WIDTH = PITCH_W - (MARGIN * 2);  // 760px
+  const PPM_X = PLAYABLE_WIDTH / 105;  // ~7.24 pixels per meter
+  
+  // Avstånd i pixels från skott till mållinje
+  const dx_px = Math.abs(gx - sx);
+  const dy_px = Math.abs(GOAL_CENTER_Y - sy);
+  const dist_px = Math.sqrt(dx_px*dx_px + dy_px*dy_px);
+  
+  // Konvertera till meter
+  const dist_m = dist_px / PPM_X;
+  
+  // Vinkel till mål
+  const d1 = Math.sqrt(dx_px*dx_px + (sy-GOAL_Y1)*(sy-GOAL_Y1));
+  const d2 = Math.sqrt(dx_px*dx_px + (sy-GOAL_Y2)*(sy-GOAL_Y2));
+  const cos_angle = (d1*d1 + d2*d2 - (GOAL_Y2-GOAL_Y1)**2) / (2*d1*d2);
+  const shot_angle = Math.acos(Math.max(-1, Math.min(1, cos_angle))) * 180 / Math.PI;
+  
+  let defenders_in_line = 0;
+  temp.defenders.forEach(d => { 
+    if (isInShotLine(sx, sy, d.x, d.y, gx, GOAL_CENTER_Y)) defenders_in_line++; 
+  });
+  
+  let gk_mod = 1.0;
+  if (temp.gk) {
+    const gk_dist = Math.sqrt((temp.gk.x-gx)**2 + (temp.gk.y-GOAL_CENTER_Y)**2);
+    gk_mod = gk_dist > 40 ? 1.25 : 1.0;
+  }
+  
+  // JUSTERAD xG-FORMEL FÖR REALISTISKA VÄRDEN
+  // Straff (11m, 0° vinkel, inga försvarare) ska ge ~0.77
+  
+  const angle_rad = shot_angle * Math.PI / 180;
+  const goal_width = 7.32;
+  
+  // Synlig målbredd från skottvinkel
+  const visible_goal = goal_width * Math.cos(angle_rad);
+  
+  // Bas-xG från avstånd och vinkel
+  // z = logit-funktion som ger 0.77 vid 11m rakt framför
+  const z = 1.5 + (visible_goal / Math.max(dist_m, 1)) * 8 - (dist_m * 0.18) - (shot_angle * 0.015);
+  let base = 1 / (1 + Math.exp(-z));
+  
+  // Modifiers
+  const body_mod = bodyPart==='foot' ? 1.0 : bodyPart==='head' ? 0.65 : 0.45;
+  const def_mod = Math.max(0.15, Math.pow(0.75, defenders_in_line));
+  
+  // Situationsmodifier
+  let sit_mod = 1.0;
+  if (origin === 'penalty') {
+    // Straff: Sätt direkt till 0.77 (standard penalty conversion rate)
+    const xg = 0.77;
+    currentXG = xg;
+    updateXGDisplay(xg, dist_m, shot_angle, defenders_in_line);
+    window._currentCalc = {dist_m, shot_angle, defenders_in_line};
+    return;
+  } else if (origin === 'counter') {
+    sit_mod = 1.15;  // Kontringar lite mer farliga
+  } else if (origin === 'corner' || origin === 'freekick') {
+    sit_mod = 0.80;  // Dödbollar svårare
+  }
+  
+  let xg = base * body_mod * def_mod * sit_mod * gk_mod;
+  
+  // Hårdtak: Max 0.85 för vanliga skott (extremt nära mål med perfekt läge)
+  if (origin !== 'penalty') {
+    xg = Math.max(0.01, Math.min(0.85, xg));
+  }
+  
+  currentXG = xg;
+  updateXGDisplay(xg, dist_m, shot_angle, defenders_in_line);
+  window._currentCalc = {dist_m, shot_angle, defenders_in_line};
+}
+
+function updateXGDisplay(xg, dist_m, shot_angle, defenders_in_line) {
+  document.getElementById('xgDisplay').textContent = xg.toFixed(3);
+  document.getElementById('distDisplay').textContent = dist_m.toFixed(1);
+  document.getElementById('angleDisplay').textContent = shot_angle.toFixed(1);
+  document.getElementById('defDisplay').textContent = defenders_in_line;
+  document.getElementById('gkDisplay').textContent = temp.gk ? 'Placerad' : '—';
+  
+  const qEl = document.getElementById('xgQuality'), isAway = team === 'away';
+  if (xg >= 0.40) {
+    qEl.textContent = isAway ? '🚨 Stor fara!' : '🔥 STOR CHANS!';
+    qEl.style.cssText = 'background:rgba(255,58,58,0.2); color:#ff6b6b;';
+    document.getElementById('xgDisplay').style.color = '#ff6b6b';
+  } else if (xg >= 0.20) {
+    qEl.textContent = isAway ? '⚠️ Farligt' : '✅ Bra chans';
+    qEl.style.cssText = 'background:rgba(255,107,26,0.2); color:#ff6b1a;';
+    document.getElementById('xgDisplay').style.color = isAway ? '#3b82f6' : '#ff6b1a';
+  } else if (xg >= 0.10) {
+    qEl.textContent = isAway ? '😐 Halvfarligt' : '⚠️ Halvbra';
+    qEl.style.cssText = 'background:rgba(251,191,36,0.2); color:#fbbf24;';
+    document.getElementById('xgDisplay').style.color = '#fbbf24';
+  } else {
+    qEl.textContent = isAway ? '✅ Ofarligt' : '😬 Svår';
+    qEl.style.cssText = 'background:rgba(90,122,96,0.2); color:#5a7a60;';
+    document.getElementById('xgDisplay').style.color = 'var(--accent)';
+  }
+}
+
+function isInShotLine(sx, sy, dx, dy, gx, gy) {
+  const t = ((dx-sx)*(gx-sx) + (dy-sy)*(gy-sy)) / ((gx-sx)**2 + (gy-sy)**2);
+  if (t < 0 || t > 1) return false;
+  const closest_x = sx + t*(gx-sx), closest_y = sy + t*(gy-sy);
+  return Math.sqrt((dx-closest_x)**2 + (dy-closest_y)**2) < 25;
+}
+
+function setTeam(t) {
+  team = t;
+  document.getElementById('teamHomeBtn').classList.toggle('active', t==='home');
+  document.getElementById('teamAwayBtn').classList.toggle('active', t==='away');
+  const hero = document.querySelector('.xg-hero');
+  if (t === 'away') {
+    hero.style.borderColor = 'rgba(59,130,246,0.4)';
+    hero.style.background = 'rgba(59,130,246,0.05)';
+    updateHint('BORTALAG: Klicka var motståndarens skytt stod (skjuter åt VÄNSTER)');
+  } else {
+    hero.style.borderColor = 'rgba(57,255,106,0.2)';
+    hero.style.background = 'rgba(57,255,106,0.05)';
+    updateHint('HEMMALAG: Klicka var din skytt stod (skjuter åt HÖGER)');
+  }
+  clearTemp();
+}
+
+function setMode(m) {
+  mode = m;
+  ['Shot','GK','Def','Assist','Clear'].forEach(id => {
+    document.getElementById('mode'+id)?.classList.remove('active');
+  });
+  if (m !== 'clear') {
+    const cap = m.charAt(0).toUpperCase() + m.slice(1);
+    document.getElementById('mode'+cap)?.classList.add('active');
+  }
+  const hints = {
+    shot: team==='home' ? 'Klicka var din skytt stod' : 'Klicka var motståndarens skytt stod',
+    gk: 'Klicka var målvakten stod',
+    def: 'Klicka var försvararna stod',
+    assist: 'Klicka var assistgivaren stod'
+  };
+  updateHint(hints[m] || '');
+}
+
+function clearTemp() {
+  temp = {shot:null, gk:null, defenders:[], assist:null};
+  currentXG = null;
+  document.getElementById('addBtn').disabled = true;
+  document.getElementById('xgDisplay').textContent = '—';
+  document.getElementById('xgQuality').textContent = 'Välj lag och placera skott';
+  document.getElementById('xgQuality').style.cssText = 'color:var(--muted)';
+  document.getElementById('xgDisplay').style.color = 'var(--accent)';
+  document.getElementById('distDisplay').textContent = '—';
+  document.getElementById('angleDisplay').textContent = '—';
+  document.getElementById('defDisplay').textContent = '0';
+  document.getElementById('gkDisplay').textContent = '—';
+  document.getElementById('assistPos').textContent = 'Klicka "👟 Assist" och placera assistgivaren på planen';
+  setMode('shot');
+  redrawMarkers();
+}
+
+function setChip(group, el, val) {
+  el.closest('.option-row').querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  if (group === 'body') bodyPart = val;
+  else if (group === 'origin') origin = val;
+  else if (group === 'zone') zone = val;
+  if (temp.shot) calculateXG();
+}
+
+function addShot() {
+  if (!temp.shot || currentXG === null) return;
+  shotCount++;
+  const calc = window._currentCalc || {};
+  player = document.getElementById('playerSelect').value;
+  assist = document.getElementById('assistSelect').value;
+  
+  shots.push({
+    id: shotCount, team, px: temp.shot.x, py: temp.shot.y, xg: currentXG,
+    dist: calc.dist_m?.toFixed(1) || '?', angle: calc.shot_angle?.toFixed(1) || '?',
+    defenders: calc.defenders_in_line || 0, body: bodyPart, origin, zone, player, assist,
+    hasGK: !!temp.gk, hasAssist: !!temp.assist,
+    assistPx: temp.assist?.x, assistPy: temp.assist?.y
+  });
+  
+  updateShotList(); updateSummary(); updateAnalysis(); clearTemp(); redrawMarkers();
+}
+
+function deleteShot(id) {
+  shots = shots.filter(s => s.id !== id);
+  updateShotList(); updateSummary(); updateAnalysis(); redrawMarkers();
+}
+
+function updateShotList() {
+  const list = document.getElementById('shotList');
+  if (!shots.length) {
+    list.innerHTML = '<div style="color:var(--muted); font-size:0.85rem; text-align:center; padding:1rem;">Inga skott ännu.<br>Välj hemma/borta och klicka!</div>';
+    return;
+  }
+  
+  const bodyL = {foot:'Fot', head:'Huvud', other:'Annat'};
+  const originL = {open:'Öppet', counter:'Kontr.', corner:'Hörna', freekick:'Frispark', penalty:'Straff', press:'Press', mistake:'Misstag'};
+  const zoneL = {center:'Mitt', left:'Väns.', right:'Höger'};
+  
+  list.innerHTML = shots.map(s => `
+    <div class="shot-item ${s.team}-shot">
+      <div class="shot-num" style="color:${s.team==='home'?'var(--accent)':'#3b82f6'}">${s.team==='home'?'🟢':'🔵'}</div>
+      <div class="shot-num">#${s.id}</div>
+      <div class="shot-xg" style="color:${s.team==='home'?xgColor(s.xg):'#3b82f6'}">${s.xg.toFixed(3)}</div>
+      <div class="shot-details">
+        ${originL[s.origin]} · ${zoneL[s.zone]}<br>
+        ${s.player || '?'}${s.assist ? ' ← '+s.assist : ''} · ${bodyL[s.body]}
+      </div>
+      <button class="shot-delete" onclick="deleteShot(${s.id})">✕</button>
+    </div>
+  `).join('');
+}
+
+function updateSummary() {
+  const home = shots.filter(s => s.team==='home');
+  const away = shots.filter(s => s.team==='away');
+  const xg = home.reduce((a,s) => a+s.xg, 0);
+  const xga = away.reduce((a,s) => a+s.xg, 0);
+  const diff = xg - xga;
+  
+  document.getElementById('sumXG').textContent = xg.toFixed(2);
+  document.getElementById('sumXGA').textContent = xga.toFixed(2);
+  document.getElementById('sumShots').textContent = home.length;
+  document.getElementById('sumShotsAway').textContent = away.length;
+  document.getElementById('sumBig').textContent = home.filter(s=>s.xg>=0.40).length;
+  document.getElementById('sumBigAway').textContent = away.filter(s=>s.xg>=0.40).length;
+  
+  const diffEl = document.getElementById('xgDiff');
+  diffEl.textContent = `xG-diff: ${diff>=0?'+':''}${diff.toFixed(2)}`;
+  diffEl.style.color = diff > 0 ? 'var(--accent)' : diff < 0 ? '#ef4444' : 'var(--muted)';
+}
+
+function updateAnalysis() {
+  const home = shots.filter(s => s.team==='home');
+  if (!home.length) {
+    ['chanceAnalysis','zoneAnalysis','playerAnalysis','assistAnalysis'].forEach(id => {
+      document.getElementById(id).style.display = 'none';
+    });
+    return;
+  }
+  
+  // Chansskapande
+  const origins = {};
+  home.forEach(s => {
+    if (!origins[s.origin]) origins[s.origin] = {count:0, xg:0};
+    origins[s.origin].count++;
+    origins[s.origin].xg += s.xg;
+  });
+  const originL = {open:'Öppet spel', counter:'Kontringar', corner:'Hörnor', freekick:'Frisparkar', penalty:'Straffar', press:'Press-vinster', mistake:'Misstag'};
+  let html = '';
+  Object.entries(origins).sort((a,b) => b[1].xg - a[1].xg).forEach(([key, val]) => {
+    html += `<div class="analysis-item">
+      <div class="analysis-label">${originL[key]}</div>
+      <div class="analysis-value">${val.count} (${val.xg.toFixed(2)} xG)</div>
+    </div>`;
+  });
+  document.getElementById('chanceBreakdown').innerHTML = html;
+  document.getElementById('chanceAnalysis').style.display = 'block';
+  
+  // Zoner
+  const zones = {};
+  home.forEach(s => {
+    if (!zones[s.zone]) zones[s.zone] = {count:0, xg:0};
+    zones[s.zone].count++;
+    zones[s.zone].xg += s.xg;
+  });
+  const zoneL = {center:'Mitten', left:'Vänster', right:'Höger'};
+  html = '';
+  Object.entries(zones).sort((a,b) => b[1].xg - a[1].xg).forEach(([key, val]) => {
+    html += `<div class="analysis-item">
+      <div class="analysis-label">${zoneL[key]}</div>
+      <div class="analysis-value">${val.count} (${val.xg.toFixed(2)} xG)</div>
+    </div>`;
+  });
+  document.getElementById('zoneBreakdown').innerHTML = html;
+  document.getElementById('zoneAnalysis').style.display = 'block';
+  
+  // Spelare
+  const playerStats = {};
+  home.forEach(s => {
+    if (!s.player) return;
+    if (!playerStats[s.player]) playerStats[s.player] = {count:0, xg:0};
+    playerStats[s.player].count++;
+    playerStats[s.player].xg += s.xg;
+  });
+  html = '';
+  Object.entries(playerStats).sort((a,b) => b[1].xg - a[1].xg).forEach(([name, val]) => {
+    html += `<div class="analysis-item">
+      <div class="analysis-label">${name}</div>
+      <div class="analysis-value">${val.count} (${val.xg.toFixed(2)} xG)</div>
+    </div>`;
+  });
+  if (html) {
+    document.getElementById('playerBreakdown').innerHTML = html;
+    document.getElementById('playerAnalysis').style.display = 'block';
+  } else {
+    document.getElementById('playerAnalysis').style.display = 'none';
+  }
+  
+  // Assists
+  const assistStats = {};
+  home.forEach(s => {
+    if (!s.assist) return;
+    if (!assistStats[s.assist]) assistStats[s.assist] = {count:0, xg:0};
+    assistStats[s.assist].count++;
+    assistStats[s.assist].xg += s.xg;
+  });
+  html = '';
+  Object.entries(assistStats).sort((a,b) => b[1].count - a[1].count).forEach(([name, val]) => {
+    html += `<div class="analysis-item">
+      <div class="analysis-label">${name}</div>
+      <div class="analysis-value">${val.count} assists (${val.xg.toFixed(2)} xG)</div>
+    </div>`;
+  });
+  if (html) {
+    document.getElementById('assistBreakdown').innerHTML = html;
+    document.getElementById('assistAnalysis').style.display = 'block';
+  } else {
+    document.getElementById('assistAnalysis').style.display = 'none';
+  }
+}
+
+function xgColor(xg) {
+  if (xg >= 0.40) return '#ff3a3a';    // Stor chans
+  if (xg >= 0.20) return '#ff6b1a';    // Bra chans
+  if (xg >= 0.10) return '#fbbf24';    // Halvbra chans
+  return '#5a7a60';                     // Svår chans
+}
+
+function updateHint(msg) { document.getElementById('hintText').textContent = msg; }
+
+// ── EXCEL EXPORT ──
+function exportExcel() {
+  const home = document.getElementById('teamHome').value || 'Hemmalag';
+  const away = document.getElementById('teamAway').value || 'Bortalag';
+  const date = document.getElementById('matchDate').value || new Date().toISOString().slice(0,10);
+  
+  const homeShots = shots.filter(s => s.team==='home');
+  const awayShots = shots.filter(s => s.team==='away');
+  
+  // Sammanfattning
+  const summaryData = [
+    ['MATCHANALYS - xG RAPPORT'],
+    [`Match: ${home} vs ${away}`],
+    [`Datum: ${date}`],
+    [],
+    ['', home, away],
+    ['xG', homeShots.reduce((a,s)=>a+s.xg,0).toFixed(2), awayShots.reduce((a,s)=>a+s.xg,0).toFixed(2)],
+    ['Skott', homeShots.length, awayShots.length],
+    ['Stora chanser (≥0.40)', homeShots.filter(s=>s.xg>=0.40).length, awayShots.filter(s=>s.xg>=0.40).length],
+  ];
+  
+  // Skottlogg
+  const bodyL = {foot:'Fot', head:'Huvud', other:'Annat'};
+  const originL = {open:'Öppet spel', counter:'Kontring', corner:'Hörna', freekick:'Frispark', penalty:'Straff', press:'Press', mistake:'Misstag'};
+  const zoneL = {center:'Mitten', left:'Vänster', right:'Höger'};
+  
+  const shotlogHeaders = ['#', 'Lag', 'xG', 'Avstånd', 'Vinkel', 'Försv.', 'Kroppsdelar', 'Ursprung', 'Zon', 'Spelare', 'Assist'];
+  const shotlogData = shots.map((s,i) => [
+    i+1,
+    s.team === 'home' ? home : away,
+    s.xg.toFixed(3),
+    s.dist,
+    s.angle,
+    s.defenders,
+    bodyL[s.body],
+    originL[s.origin],
+    zoneL[s.zone],
+    s.player || '',
+    s.assist || ''
+  ]);
+  
+  const wb = XLSX.utils.book_new();
+  
+  const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
+  XLSX.utils.book_append_sheet(wb, ws1, 'Sammanfattning');
+  
+  const ws2 = XLSX.utils.aoa_to_sheet([shotlogHeaders, ...shotlogData]);
+  XLSX.utils.book_append_sheet(wb, ws2, 'Skottlogg');
+  
+  XLSX.writeFile(wb, `xg_rapport_${date}.xlsx`);
+}
+
+// ── TEXT EXPORT ──
+function exportReport() {
+  const home = document.getElementById('teamHome').value || 'Hemmalag';
+  const away = document.getElementById('teamAway').value || 'Bortalag';
+  const date = document.getElementById('matchDate').value || new Date().toISOString().slice(0,10);
+  
+  const homeShots = shots.filter(s => s.team==='home');
+  const awayShots = shots.filter(s => s.team==='away');
+  const xg = homeShots.reduce((a,s) => a+s.xg, 0);
+  const xga = awayShots.reduce((a,s) => a+s.xg, 0);
+  const diff = xg - xga;
+  
+  const bodyL = {foot:'Fot', head:'Huvud', other:'Annat'};
+  const originL = {open:'Öppet spel', counter:'Kontring', corner:'Hörna', freekick:'Frispark', penalty:'Straff', press:'Press-vinst', mistake:'Misstag'};
+  const zoneL = {center:'Mitten', left:'Vänster', right:'Höger'};
+  
+  let txt = `${'='.repeat(65)}\n⚽  MATCHANALYS — xG RAPPORT ULTIMATE\n${'='.repeat(65)}\n`;
+  txt += `Match:   ${home} vs ${away}\nDatum:   ${date}\n\n`;
+  
+  txt += `MATCHSAMMANFATTNING\n${'-'.repeat(65)}\n`;
+  txt += `                   ${home.padEnd(20)} ${away}\n`;
+  txt += `xG:                ${xg.toFixed(2).padEnd(20)} ${xga.toFixed(2)}\n`;
+  txt += `Skott:             ${String(homeShots.length).padEnd(20)} ${awayShots.length}\n`;
+  txt += `Stora chanser:     ${String(homeShots.filter(s=>s.xg>=0.40).length).padEnd(20)} ${awayShots.filter(s=>s.xg>=0.40).length}\n`;
+  txt += `\nxG-differens: ${diff>=0?'+':''}${diff.toFixed(2)}\n\n`;
+  
+  // Alla analyser...
+  if (homeShots.length) {
+    // Chansskapande
+    const origins = {};
+    homeShots.forEach(s => {
+      if (!origins[s.origin]) origins[s.origin] = {count:0, xg:0};
+      origins[s.origin].count++; origins[s.origin].xg += s.xg;
+    });
+    txt += `${home.toUpperCase()} — CHANSSKAPANDE\n${'-'.repeat(65)}\n`;
+    Object.entries(origins).sort((a,b) => b[1].xg - a[1].xg).forEach(([key, val]) => {
+      txt += `${originL[key].padEnd(20)} ${val.count} skott (${val.xg.toFixed(2)} xG)\n`;
+    });
+    
+    // Zoner
+    const zones = {};
+    homeShots.forEach(s => {
+      if (!zones[s.zone]) zones[s.zone] = {count:0, xg:0};
+      zones[s.zone].count++; zones[s.zone].xg += s.xg;
+    });
+    txt += `\n${home.toUpperCase()} — ZONANALYS\n${'-'.repeat(65)}\n`;
+    Object.entries(zones).sort((a,b) => b[1].xg - a[1].xg).forEach(([key, val]) => {
+      txt += `${zoneL[key].padEnd(20)} ${val.count} skott (${val.xg.toFixed(2)} xG)\n`;
+    });
+    
+    // Spelare
+    const playerStats = {}, assistStats = {};
+    homeShots.forEach(s => {
+      if (s.player) {
+        if (!playerStats[s.player]) playerStats[s.player] = {count:0, xg:0};
+        playerStats[s.player].count++; playerStats[s.player].xg += s.xg;
+      }
+      if (s.assist) {
+        if (!assistStats[s.assist]) assistStats[s.assist] = {count:0, xg:0};
+        assistStats[s.assist].count++; assistStats[s.assist].xg += s.xg;
+      }
+    });
+    
+    if (Object.keys(playerStats).length) {
+      txt += `\n${home.toUpperCase()} — TOPSCORERS\n${'-'.repeat(65)}\n`;
+      Object.entries(playerStats).sort((a,b) => b[1].xg - a[1].xg).forEach(([name, val]) => {
+        txt += `${name.padEnd(20)} ${val.count} skott (${val.xg.toFixed(2)} xG)\n`;
+      });
+    }
+    
+    if (Object.keys(assistStats).length) {
+      txt += `\n${home.toUpperCase()} — TOPASSISTER\n${'-'.repeat(65)}\n`;
+      Object.entries(assistStats).sort((a,b) => b[1].count - a[1].count).forEach(([name, val]) => {
+        txt += `${name.padEnd(20)} ${val.count} assists (${val.xg.toFixed(2)} xG)\n`;
+      });
+    }
+    
+    txt += `\n${home.toUpperCase()} — SKOTTLOGG\n${'-'.repeat(65)}\n`;
+    homeShots.forEach((s,i) => {
+      const q = s.xg>=0.40 ? 'STOR CHANS' : s.xg>=0.20 ? 'Bra chans' : 'Svår chans';
+      txt += `\n#${i+1}  xG: ${s.xg.toFixed(3)} (${(s.xg*100).toFixed(0)}%) — ${q}\n`;
+      txt += `   ${originL[s.origin]} · ${zoneL[s.zone]} · ${s.player || 'Okänd'}${s.assist ? ' ← '+s.assist : ''}\n`;
+      txt += `   ${s.dist}m · ${s.angle}° · ${s.defenders} försv · ${bodyL[s.body]}\n`;
+    });
+  }
+  
+  txt += `\n${'='.repeat(65)}\nGenererad: ${new Date().toLocaleString('sv-SE')}\n`;
+  
+  const blob = new Blob([txt], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `xg_rapport_ultimate_${date}.txt`;
+  a.click();
+}
+
+document.getElementById('matchDate').value = new Date().toISOString().slice(0,10);
+drawPitch();
+updateHint('Välj hemmalag eller bortalag och klicka på planen');
+</script>
+</body>
+</html>
